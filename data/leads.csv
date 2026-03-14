@@ -1,0 +1,11 @@
+age,income,city,gender,website_visits,time_spent,converted
+25,40000,Delhi,Male,5,10,0
+32,60000,Mumbai,Female,8,20,1
+28,45000,Delhi,Female,4,8,0
+40,80000,Bangalore,Male,10,30,1
+35,75000,Mumbai,Male,7,25,1
+23,30000,Delhi,Female,3,5,0
+45,90000,Bangalore,Female,12,40,1
+30,50000,Mumbai,Male,6,15,0
+27,42000,Delhi,Male,5,12,0
+50,100000,Bangalore,Male,15,50,1

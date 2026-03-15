@@ -91,19 +91,24 @@ function App() {
   };
 
   const predict = async () => {
-    const input = {
-      age: Number(document.getElementById("age").value),
-      income: Number(document.getElementById("income").value),
-      city: document.getElementById("city").value,
-      gender: document.getElementById("gender").value,
-      website_visits: Number(document.getElementById("visits").value),
-      time_spent: Number(document.getElementById("time").value),
-    };
+  const input = {
+    age: Number(document.getElementById("age").value),
+    income: Number(document.getElementById("income").value),
+    city: document.getElementById("city").value,
+    gender: document.getElementById("gender").value,
+    website_visits: Number(document.getElementById("visits").value),
+    time_spent: Number(document.getElementById("time").value),
+  };
 
-    axios.post("/predict", input);
+  try {
+    const res = await axios.post("/predict", input);
+
     setPrediction(res.data.prediction);
     setProbability(res.data.probability);
-  };
+  } catch (err) {
+    console.error("Prediction failed", err);
+  }
+};
 
   const modelScores = data
     ? Object.entries(data.model_scores).map(([model, score]) => ({

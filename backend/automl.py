@@ -17,7 +17,8 @@ from sklearn.neighbors import KNeighborsClassifier
 
 import xgboost as xgb
 
-from preprocessing import build_pipeline
+# IMPORTANT: backend import for deployment
+from backend.preprocessing import build_pipeline
 
 
 def run_automl(X, y):
@@ -45,7 +46,10 @@ def run_automl(X, y):
         ),
 
         "XGBoost": (
-            xgb.XGBClassifier(eval_metric="logloss"),
+            xgb.XGBClassifier(
+                eval_metric="logloss",
+                use_label_encoder=False
+            ),
             {"n_estimators": [50, 100], "max_depth": [3, 6]}
         ),
     }
@@ -56,8 +60,11 @@ def run_automl(X, y):
 
     scores = {}
 
+    # Train-test split
     X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42
+        X, y,
+        test_size=0.2,
+        random_state=42
     )
 
     best_preds = None
@@ -67,7 +74,10 @@ def run_automl(X, y):
 
         pipeline = build_pipeline(model, X_train)
 
-        param_grid = {"model__" + k: v for k, v in params.items()}
+        param_grid = {
+            "model__" + key: value
+            for key, value in params.items()
+        }
 
         grid = GridSearchCV(
             pipeline,
@@ -96,19 +106,21 @@ def run_automl(X, y):
 
             if hasattr(tuned_model, "predict_proba"):
                 best_proba = tuned_model.predict_proba(X_test)[:, 1]
-
             else:
                 best_proba = preds
 
+    # Model evaluation metrics
     metrics = {
         "accuracy": accuracy_score(y_test, best_preds),
-        "precision": precision_score(y_test, best_preds),
-        "recall": recall_score(y_test, best_preds),
-        "f1": f1_score(y_test, best_preds)
+        "precision": precision_score(y_test, best_preds, zero_division=0),
+        "recall": recall_score(y_test, best_preds, zero_division=0),
+        "f1": f1_score(y_test, best_preds, zero_division=0)
     }
 
+    # Confusion matrix
     conf_matrix = confusion_matrix(y_test, best_preds).tolist()
 
+    # ROC curve
     fpr, tpr, _ = roc_curve(y_test, best_proba)
 
     roc_auc = auc(fpr, tpr)
@@ -119,4 +131,12 @@ def run_automl(X, y):
         "auc": roc_auc
     }
 
-    return best_model, best_name, best_score, scores, metrics, conf_matrix, roc_data
+    return (
+        best_model,
+        best_name,
+        best_score,
+        scores,
+        metrics,
+        conf_matrix,
+        roc_data
+    )

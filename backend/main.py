@@ -5,6 +5,7 @@ from fastapi.responses import FileResponse
 
 import pandas as pd
 import joblib
+import os
 
 from backend.automl import run_automl
 from backend.explainability import get_feature_importance
@@ -15,7 +16,11 @@ from backend.data_profiler import generate_report
 
 app = FastAPI()
 
-# CORS for frontend requests
+# Get absolute path to static directory
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+STATIC_DIR = os.path.join(BASE_DIR, "static")
+
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -24,8 +29,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Serve React static files
-app.mount("/static", StaticFiles(directory="backend/static"), name="static")
+# Static files
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
 # =============================
@@ -166,20 +171,19 @@ def download_model():
 
 @app.get("/")
 def serve_react():
-    return FileResponse("backend/static/index.html")
+    return FileResponse(os.path.join(STATIC_DIR, "index.html"))
 
 
 @app.get("/favicon.ico")
 def favicon():
-    return FileResponse("backend/static/favicon.ico")
+    return FileResponse(os.path.join(STATIC_DIR, "favicon.ico"))
 
 
 @app.get("/manifest.json")
 def manifest():
-    return FileResponse("backend/static/manifest.json")
+    return FileResponse(os.path.join(STATIC_DIR, "manifest.json"))
 
 
-# Fix React routing
 @app.get("/{full_path:path}")
 def serve_react_routes(full_path: str):
-    return FileResponse("backend/static/index.html")
+    return FileResponse(os.path.join(STATIC_DIR, "index.html"))

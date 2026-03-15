@@ -16,7 +16,7 @@ from backend.data_profiler import generate_report
 
 app = FastAPI()
 
-# Get absolute path to static directory
+# Path setup
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 
@@ -29,8 +29,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Static files
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+# Serve React JS/CSS files
+app.mount(
+    "/static",
+    StaticFiles(directory=os.path.join(STATIC_DIR, "static")),
+    name="static"
+)
 
 
 # =============================
@@ -184,6 +188,17 @@ def manifest():
     return FileResponse(os.path.join(STATIC_DIR, "manifest.json"))
 
 
+@app.get("/logo192.png")
+def logo192():
+    return FileResponse(os.path.join(STATIC_DIR, "logo192.png"))
+
+
+@app.get("/logo512.png")
+def logo512():
+    return FileResponse(os.path.join(STATIC_DIR, "logo512.png"))
+
+
+# React Router support
 @app.get("/{full_path:path}")
 def serve_react_routes(full_path: str):
     return FileResponse(os.path.join(STATIC_DIR, "index.html"))

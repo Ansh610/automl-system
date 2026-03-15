@@ -44,11 +44,11 @@ function App() {
     palette: { mode: darkMode ? "dark" : "light" },
   });
 
-  const textColor = darkMode ? "#ffffff" : "#000000";
+  const textColor = darkMode ? "#fff" : "#000";
 
   const tooltipStyle = {
-    backgroundColor: darkMode ? "#1e293b" : "#ffffff",
-    color: darkMode ? "#ffffff" : "#000000",
+    backgroundColor: darkMode ? "#1e293b" : "#fff",
+    color: darkMode ? "#fff" : "#000",
   };
 
   const [data, setData] = useState(null);
@@ -154,6 +154,8 @@ function App() {
           background: darkMode ? "#020617" : "#f1f5f9",
         }}
       >
+        {/* HEADER */}
+
         <Box display="flex" justifyContent="space-between" mb={4}>
           <Typography
             variant="h4"
@@ -179,7 +181,7 @@ function App() {
           />
         </Box>
 
-        {/* Upload Dataset */}
+        {/* UPLOAD DATASET */}
 
         <Card sx={{ mb: 4 }}>
           <CardContent>
@@ -216,11 +218,9 @@ function App() {
 
         {error && <Alert severity="error">{error}</Alert>}
 
-        {/* Dashboard appears only after training */}
-
         {data && (
           <Box>
-            {/* Best Model */}
+            {/* BEST MODEL + BIAS */}
 
             <Grid container spacing={3} mb={4}>
               <Grid item xs={12} md={6}>
@@ -258,7 +258,7 @@ function App() {
               </Grid>
             </Grid>
 
-            {/* Model Comparison */}
+            {/* MODEL COMPARISON */}
 
             <Card sx={{ mb: 4 }}>
               <CardContent>
@@ -276,7 +276,49 @@ function App() {
               </CardContent>
             </Card>
 
-            {/* ROC Curve */}
+            {/* METRICS */}
+
+            <Card sx={{ mb: 4 }}>
+              <CardContent>
+                <Typography variant="h5">
+                  Classification Performance Metrics
+                </Typography>
+
+                <ResponsiveContainer width="100%" height={400}>
+                  <BarChart data={metricsChart}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="metric" tick={{ fill: textColor }} />
+                    <YAxis tick={{ fill: textColor }} />
+                    <Tooltip contentStyle={tooltipStyle} />
+                    <Bar dataKey="value" fill="#22c55e" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            {/* FEATURE IMPORTANCE */}
+
+            <Card sx={{ mb: 4 }}>
+              <CardContent>
+                <Typography variant="h5">Top Influential Features</Typography>
+
+                <ResponsiveContainer width="100%" height={400}>
+                  <BarChart layout="vertical" data={featureImportance}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis type="number" tick={{ fill: textColor }} />
+                    <YAxis
+                      dataKey="feature"
+                      type="category"
+                      tick={{ fill: textColor }}
+                    />
+                    <Tooltip contentStyle={tooltipStyle} />
+                    <Bar dataKey="value" fill="#9333ea" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            {/* ROC */}
 
             <Card sx={{ mb: 4 }}>
               <CardContent>
@@ -285,20 +327,8 @@ function App() {
                 <ResponsiveContainer width="100%" height={400}>
                   <LineChart data={rocData}>
                     <CartesianGrid strokeDasharray="3 3" />
-
-                    <XAxis
-                      type="number"
-                      dataKey="fpr"
-                      domain={[0, 1]}
-                      tick={{ fill: textColor }}
-                    />
-
-                    <YAxis
-                      type="number"
-                      domain={[0, 1]}
-                      tick={{ fill: textColor }}
-                    />
-
+                    <XAxis dataKey="fpr" tick={{ fill: textColor }} />
+                    <YAxis tick={{ fill: textColor }} />
                     <Tooltip contentStyle={tooltipStyle} />
 
                     <Area
@@ -318,10 +348,6 @@ function App() {
                     />
                   </LineChart>
                 </ResponsiveContainer>
-
-                <Typography mt={2}>
-                  AUC Score: {data.roc_curve.auc.toFixed(3)}
-                </Typography>
               </CardContent>
             </Card>
           </Box>

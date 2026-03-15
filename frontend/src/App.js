@@ -35,6 +35,8 @@ import {
   Area,
 } from "recharts";
 
+const API = "https://automl-system-1.onrender.com";
+
 function App() {
   const [darkMode, setDarkMode] = useState(false);
 
@@ -62,7 +64,7 @@ function App() {
   }, []);
 
   const { getRootProps, getInputProps } = useDropzone({
-    accept: ".csv",
+    accept: { "text/csv": [".csv"] },
     onDrop,
   });
 
@@ -78,12 +80,14 @@ function App() {
     try {
       setLoading(true);
 
-      const res = await axios.post("/train?target=converted", formData, {
+      const res = await axios.post(`${API}/train?target=converted`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
+
       setData(res.data);
       setError(null);
-    } catch {
+    } catch (err) {
+      console.error(err);
       setError("Training failed");
     } finally {
       setLoading(false);
@@ -91,24 +95,24 @@ function App() {
   };
 
   const predict = async () => {
-  const input = {
-    age: Number(document.getElementById("age").value),
-    income: Number(document.getElementById("income").value),
-    city: document.getElementById("city").value,
-    gender: document.getElementById("gender").value,
-    website_visits: Number(document.getElementById("visits").value),
-    time_spent: Number(document.getElementById("time").value),
+    const input = {
+      age: Number(document.getElementById("age").value),
+      income: Number(document.getElementById("income").value),
+      city: document.getElementById("city").value,
+      gender: document.getElementById("gender").value,
+      website_visits: Number(document.getElementById("visits").value),
+      time_spent: Number(document.getElementById("time").value),
+    };
+
+    try {
+      const res = await axios.post(`${API}/predict`, input);
+
+      setPrediction(res.data.prediction);
+      setProbability(res.data.probability);
+    } catch (err) {
+      console.error("Prediction failed", err);
+    }
   };
-
-  try {
-    const res = await axios.post("/predict", input);
-
-    setPrediction(res.data.prediction);
-    setProbability(res.data.probability);
-  } catch (err) {
-    console.error("Prediction failed", err);
-  }
-};
 
   const modelScores = data
     ? Object.entries(data.model_scores).map(([model, score]) => ({
@@ -158,7 +162,6 @@ function App() {
               background: "linear-gradient(90deg,#3b82f6,#9333ea)",
               WebkitBackgroundClip: "text",
               WebkitTextFillColor: "transparent",
-              letterSpacing: 1,
             }}
           >
             🚀 AutoML Intelligence Dashboard
@@ -177,6 +180,7 @@ function App() {
         </Box>
 
         {/* Upload Dataset */}
+
         <Card sx={{ mb: 4 }}>
           <CardContent>
             <Box
@@ -212,19 +216,24 @@ function App() {
 
         {error && <Alert severity="error">{error}</Alert>}
 
+        {/* Dashboard appears only after training */}
+
         {data && (
           <Box>
-            {/* Best Model + Bias */}
+            {/* Best Model */}
+
             <Grid container spacing={3} mb={4}>
               <Grid item xs={12} md={6}>
                 <Card>
                   <CardContent>
                     <Typography variant="h5">Best Model</Typography>
+
                     <Chip
                       label={data.best_model}
                       color="primary"
                       sx={{ mt: 1 }}
                     />
+
                     <Typography sx={{ mt: 2 }}>
                       Accuracy: {(data.accuracy * 100).toFixed(2)}%
                     </Typography>
@@ -236,9 +245,11 @@ function App() {
                 <Card>
                   <CardContent>
                     <Typography variant="h5">Bias Report</Typography>
+
                     <Typography>
                       Gender Bias: {data.bias_report.gender_bias}
                     </Typography>
+
                     <Typography>
                       City Bias: {data.bias_report.city_bias}
                     </Typography>
@@ -248,6 +259,7 @@ function App() {
             </Grid>
 
             {/* Model Comparison */}
+
             <Card sx={{ mb: 4 }}>
               <CardContent>
                 <Typography variant="h5">Model Accuracy Comparison</Typography>
@@ -264,56 +276,8 @@ function App() {
               </CardContent>
             </Card>
 
-            {/* Metrics */}
-            <Card sx={{ mb: 4 }}>
-              <CardContent>
-                <Typography variant="h5">
-                  Classification Performance Metrics
-                </Typography>
-
-                <ResponsiveContainer width="100%" height={400}>
-                  <BarChart data={metricsChart}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="metric" tick={{ fill: textColor }} />
-                    <YAxis tick={{ fill: textColor }} />
-                    <Tooltip contentStyle={tooltipStyle} />
-                    <Bar dataKey="value" fill="#22c55e" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-
-            {/* Feature Importance */}
-            <Card sx={{ mb: 4 }}>
-              <CardContent>
-                <Typography variant="h5">Top Influential Features</Typography>
-
-                <ResponsiveContainer width="100%" height={400}>
-                  <BarChart
-                    layout="vertical"
-                    data={featureImportance}
-                    margin={{ top: 20, right: 40, left: 120, bottom: 20 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" />
-
-                    <XAxis type="number" tick={{ fill: textColor }} />
-
-                    <YAxis
-                      type="category"
-                      dataKey="feature"
-                      width={120}
-                      tick={{ fill: textColor }}
-                    />
-
-                    <Tooltip contentStyle={tooltipStyle} />
-
-                    <Bar dataKey="value" fill="#9333ea" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-
             {/* ROC Curve */}
+
             <Card sx={{ mb: 4 }}>
               <CardContent>
                 <Typography variant="h5">ROC Curve</Typography>
@@ -360,194 +324,6 @@ function App() {
                 </Typography>
               </CardContent>
             </Card>
-
-            {/* Confusion + Prediction */}
-            <Grid container spacing={3} alignItems="stretch">
-              <Grid item xs={12} md={6}>
-                <Card sx={{ height: "100%" }}>
-                  <CardContent>
-                    <Typography variant="h5" sx={{ mb: 3 }}>
-                      Confusion Matrix
-                    </Typography>
-
-                    <Box
-                      sx={{
-                        display: "grid",
-                        gridTemplateColumns: "1fr 1fr",
-                        gap: 3,
-                      }}
-                    >
-                      {[
-                        {
-                          label: "True Negative",
-                          value: data.confusion_matrix[0][0],
-                          color: "#bfdbfe",
-                        },
-                        {
-                          label: "False Positive",
-                          value: data.confusion_matrix[0][1],
-                          color: "#fecaca",
-                        },
-                        {
-                          label: "False Negative",
-                          value: data.confusion_matrix[1][0],
-                          color: "#fde68a",
-                        },
-                        {
-                          label: "True Positive",
-                          value: data.confusion_matrix[1][1],
-                          color: "#bbf7d0",
-                        },
-                      ].map((cell) => (
-                        <Box
-                          key={cell.label}
-                          sx={{
-                            borderRadius: 3,
-                            background: cell.color,
-                            display: "flex",
-                            flexDirection: "column",
-                            justifyContent: "center",
-                            alignItems: "center",
-                            p: 3,
-                          }}
-                        >
-                          <Typography sx={{ color: "#000", fontWeight: 600 }}>
-                            {cell.label}
-                          </Typography>
-
-                          <Typography
-                            sx={{
-                              fontSize: 42,
-                              fontWeight: 800,
-                              color: "#000",
-                            }}
-                          >
-                            {cell.value}
-                          </Typography>
-                        </Box>
-                      ))}
-                    </Box>
-                  </CardContent>
-                </Card>
-              </Grid>
-
-              {/* Prediction */}
-              <Grid item xs={12} md={6}>
-                <Card sx={{ height: "100%" }}>
-                  <CardContent>
-                    <Typography variant="h5">Predict Conversion</Typography>
-
-                    <TextField id="age" label="Age" fullWidth sx={{ mt: 2 }} />
-                    <TextField
-                      id="income"
-                      label="Income"
-                      fullWidth
-                      sx={{ mt: 2 }}
-                    />
-                    <TextField
-                      id="city"
-                      label="City"
-                      fullWidth
-                      sx={{ mt: 2 }}
-                    />
-
-                    <FormControl fullWidth sx={{ mt: 2 }}>
-                      <InputLabel>Gender</InputLabel>
-                      <Select id="gender">
-                        <MenuItem value="Male">Male</MenuItem>
-                        <MenuItem value="Female">Female</MenuItem>
-                      </Select>
-                    </FormControl>
-
-                    <TextField
-                      id="visits"
-                      label="Website Visits"
-                      fullWidth
-                      sx={{ mt: 2 }}
-                    />
-                    <TextField
-                      id="time"
-                      label="Time Spent"
-                      fullWidth
-                      sx={{ mt: 2 }}
-                    />
-
-                    <Button
-                      variant="contained"
-                      sx={{ mt: 3 }}
-                      onClick={predict}
-                    >
-                      Predict
-                    </Button>
-
-                    {prediction !== null && (
-                      <Box
-                        mt={3}
-                        sx={{
-                          p: 3,
-                          borderRadius: 2,
-                          textAlign: "center",
-                          background:
-                            prediction === 1
-                              ? "linear-gradient(135deg,#dcfce7,#bbf7d0)"
-                              : "linear-gradient(135deg,#fee2e2,#fecaca)",
-                        }}
-                      >
-                        <Typography
-                          variant="h5"
-                          fontWeight="bold"
-                          sx={{
-                            color: prediction === 1 ? "#15803d" : "#b91c1c",
-                          }}
-                        >
-                          {prediction === 1
-                            ? "✅ Customer Likely to Convert"
-                            : "❌ Customer Unlikely to Convert"}
-                        </Typography>
-
-                        {probability && (
-                          <>
-                            <Typography
-                              mt={1}
-                              sx={{
-                                fontWeight: 600,
-                                color: darkMode ? "#0f172a" : "#111827",
-                              }}
-                            >
-                              Conversion Probability:{" "}
-                              {(probability * 100).toFixed(2)}%
-                            </Typography>
-
-                            <Box
-                              sx={{
-                                mt: 2,
-                                height: 10,
-                                borderRadius: 5,
-                                background: "#e5e7eb",
-                                overflow: "hidden",
-                              }}
-                            >
-                              <Box
-                                sx={{
-                                  width: `${probability * 100}%`,
-                                  height: "100%",
-                                  background:
-                                    probability > 0.6
-                                      ? "#22c55e"
-                                      : probability > 0.4
-                                        ? "#facc15"
-                                        : "#ef4444",
-                                }}
-                              />
-                            </Box>
-                          </>
-                        )}
-                      </Box>
-                    )}
-                  </CardContent>
-                </Card>
-              </Grid>
-            </Grid>
           </Box>
         )}
       </Box>

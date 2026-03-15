@@ -1,7 +1,6 @@
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 import pandas as pd
@@ -16,6 +15,7 @@ from backend.data_profiler import generate_report
 
 app = FastAPI()
 
+# CORS for frontend requests
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -23,7 +23,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Serve React static files
+app.mount("/static", StaticFiles(directory="backend/static"), name="static")
+
+
+# =============================
+# TRAIN MODEL
+# =============================
 
 @app.post("/train")
 async def train(file: UploadFile, target: str):
@@ -48,7 +55,6 @@ async def train(file: UploadFile, target: str):
     joblib.dump(model, "model.pkl")
 
     importance = get_feature_importance(X, y)
-
     importance_dict = dict(zip(X.columns, importance))
 
     gender_bias = None
@@ -84,12 +90,15 @@ async def train(file: UploadFile, target: str):
     }
 
 
+# =============================
+# PREDICT
+# =============================
+
 @app.post("/predict")
 async def predict(data: dict):
 
     model = joblib.load("model.pkl")
 
-    # Expected columns (same as training)
     columns = [
         "age",
         "income",
@@ -99,15 +108,12 @@ async def predict(data: dict):
         "time_spent"
     ]
 
-    # Create dataframe with correct structure
     df = pd.DataFrame([data])
 
-    # Ensure all columns exist
     for col in columns:
         if col not in df.columns:
             df[col] = None
 
-    # Ensure column order
     df = df[columns]
 
     prediction = model.predict(df)
@@ -122,6 +128,11 @@ async def predict(data: dict):
         "probability": probability
     }
 
+
+# =============================
+# GENERATE DATASET
+# =============================
+
 @app.get("/generate-data")
 def create_dataset():
 
@@ -135,6 +146,10 @@ def create_dataset():
     }
 
 
+# =============================
+# DOWNLOAD MODEL
+# =============================
+
 @app.get("/download-model")
 def download_model():
 
@@ -143,26 +158,28 @@ def download_model():
         media_type="application/octet-stream",
         filename="model.pkl"
     )
+
+
+# =============================
+# REACT FRONTEND
+# =============================
+
 @app.get("/")
 def serve_react():
-    return FileResponse("static/index.html")
+    return FileResponse("backend/static/index.html")
 
-# favicon
+
 @app.get("/favicon.ico")
 def favicon():
-    return FileResponse("static/favicon.ico")
+    return FileResponse("backend/static/favicon.ico")
 
-# manifest
+
 @app.get("/manifest.json")
 def manifest():
-    return FileResponse("static/manifest.json")
+    return FileResponse("backend/static/manifest.json")
 
-# React app
-@app.get("/")
-def serve_react():
-    return FileResponse("static/index.html")
 
-# React routing fix
+# Fix React routing
 @app.get("/{full_path:path}")
 def serve_react_routes(full_path: str):
-    return FileResponse("static/index.html")
+    return FileResponse("backend/static/index.html")

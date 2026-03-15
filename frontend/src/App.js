@@ -475,10 +475,63 @@ function App() {
                           Prediction: {prediction}
                         </Typography>
 
-                        {probability && (
-                          <Typography>
-                            Probability: {(probability * 100).toFixed(2)}%
-                          </Typography>
+                        {prediction !== null && (
+                          <Box
+                            mt={3}
+                            sx={{
+                              p: 3,
+                              borderRadius: 2,
+                              textAlign: "center",
+                              background:
+                                prediction === 1
+                                  ? "linear-gradient(135deg,#dcfce7,#bbf7d0)"
+                                  : "linear-gradient(135deg,#fee2e2,#fecaca)",
+                            }}
+                          >
+                            <Typography
+                              variant="h5"
+                              fontWeight="bold"
+                              sx={{
+                                color: prediction === 1 ? "#15803d" : "#b91c1c",
+                              }}
+                            >
+                              {prediction === 1
+                                ? "✅ Customer Likely to Convert"
+                                : "❌ Customer Unlikely to Convert"}
+                            </Typography>
+
+                            {probability && (
+                              <>
+                                <Typography mt={1} sx={{ fontWeight: 600 }}>
+                                  Conversion Probability:{" "}
+                                  {(probability * 100).toFixed(2)}%
+                                </Typography>
+
+                                <Box
+                                  sx={{
+                                    mt: 2,
+                                    height: 10,
+                                    borderRadius: 5,
+                                    background: "#e5e7eb",
+                                    overflow: "hidden",
+                                  }}
+                                >
+                                  <Box
+                                    sx={{
+                                      width: `${probability * 100}%`,
+                                      height: "100%",
+                                      background:
+                                        probability > 0.6
+                                          ? "#22c55e"
+                                          : probability > 0.4
+                                            ? "#facc15"
+                                            : "#ef4444",
+                                    }}
+                                  />
+                                </Box>
+                              </>
+                            )}
+                          </Box>
                         )}
                       </Box>
                     )}

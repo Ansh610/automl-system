@@ -181,7 +181,7 @@ function App() {
           />
         </Box>
 
-        {/* UPLOAD DATASET */}
+        {/* UPLOAD */}
 
         <Card sx={{ mb: 4 }}>
           <CardContent>
@@ -220,7 +220,7 @@ function App() {
 
         {data && (
           <Box>
-            {/* BEST MODEL + BIAS */}
+            {/* BEST MODEL */}
 
             <Grid container spacing={3} mb={4}>
               <Grid item xs={12} md={6}>
@@ -267,8 +267,8 @@ function App() {
                 <ResponsiveContainer width="100%" height={400}>
                   <BarChart data={modelScores}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="model" tick={{ fill: textColor }} />
-                    <YAxis tick={{ fill: textColor }} />
+                    <XAxis dataKey="model" />
+                    <YAxis />
                     <Tooltip contentStyle={tooltipStyle} />
                     <Bar dataKey="score" fill="#3b82f6" />
                   </BarChart>
@@ -287,8 +287,8 @@ function App() {
                 <ResponsiveContainer width="100%" height={400}>
                   <BarChart data={metricsChart}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="metric" tick={{ fill: textColor }} />
-                    <YAxis tick={{ fill: textColor }} />
+                    <XAxis dataKey="metric" />
+                    <YAxis />
                     <Tooltip contentStyle={tooltipStyle} />
                     <Bar dataKey="value" fill="#22c55e" />
                   </BarChart>
@@ -305,12 +305,8 @@ function App() {
                 <ResponsiveContainer width="100%" height={400}>
                   <BarChart layout="vertical" data={featureImportance}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis type="number" tick={{ fill: textColor }} />
-                    <YAxis
-                      dataKey="feature"
-                      type="category"
-                      tick={{ fill: textColor }}
-                    />
+                    <XAxis type="number" />
+                    <YAxis dataKey="feature" type="category" />
                     <Tooltip contentStyle={tooltipStyle} />
                     <Bar dataKey="value" fill="#9333ea" />
                   </BarChart>
@@ -318,7 +314,7 @@ function App() {
               </CardContent>
             </Card>
 
-            {/* ROC */}
+            {/* ROC CURVE */}
 
             <Card sx={{ mb: 4 }}>
               <CardContent>
@@ -327,8 +323,8 @@ function App() {
                 <ResponsiveContainer width="100%" height={400}>
                   <LineChart data={rocData}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="fpr" tick={{ fill: textColor }} />
-                    <YAxis tick={{ fill: textColor }} />
+                    <XAxis dataKey="fpr" />
+                    <YAxis />
                     <Tooltip contentStyle={tooltipStyle} />
 
                     <Area
@@ -350,6 +346,146 @@ function App() {
                 </ResponsiveContainer>
               </CardContent>
             </Card>
+
+            {/* CONFUSION MATRIX + PREDICTION */}
+
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={6}>
+                <Card>
+                  <CardContent>
+                    <Typography variant="h5" sx={{ mb: 3 }}>
+                      Confusion Matrix
+                    </Typography>
+
+                    <Box
+                      sx={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 1fr",
+                        gap: 3,
+                      }}
+                    >
+                      {[
+                        {
+                          label: "True Negative",
+                          value: data.confusion_matrix[0][0],
+                          color: "#bfdbfe",
+                        },
+                        {
+                          label: "False Positive",
+                          value: data.confusion_matrix[0][1],
+                          color: "#fecaca",
+                        },
+                        {
+                          label: "False Negative",
+                          value: data.confusion_matrix[1][0],
+                          color: "#fde68a",
+                        },
+                        {
+                          label: "True Positive",
+                          value: data.confusion_matrix[1][1],
+                          color: "#bbf7d0",
+                        },
+                      ].map((cell) => (
+                        <Box
+                          key={cell.label}
+                          sx={{
+                            borderRadius: 3,
+                            background: cell.color,
+                            display: "flex",
+                            flexDirection: "column",
+                            justifyContent: "center",
+                            alignItems: "center",
+                            p: 3,
+                          }}
+                        >
+                          <Typography sx={{ color: "#000", fontWeight: 600 }}>
+                            {cell.label}
+                          </Typography>
+
+                          <Typography
+                            sx={{
+                              fontSize: 42,
+                              fontWeight: 800,
+                              color: "#000",
+                            }}
+                          >
+                            {cell.value}
+                          </Typography>
+                        </Box>
+                      ))}
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+
+              {/* PREDICTION */}
+
+              <Grid item xs={12} md={6}>
+                <Card>
+                  <CardContent>
+                    <Typography variant="h5">Predict Conversion</Typography>
+
+                    <TextField id="age" label="Age" fullWidth sx={{ mt: 2 }} />
+                    <TextField
+                      id="income"
+                      label="Income"
+                      fullWidth
+                      sx={{ mt: 2 }}
+                    />
+                    <TextField
+                      id="city"
+                      label="City"
+                      fullWidth
+                      sx={{ mt: 2 }}
+                    />
+
+                    <FormControl fullWidth sx={{ mt: 2 }}>
+                      <InputLabel>Gender</InputLabel>
+
+                      <Select id="gender">
+                        <MenuItem value="Male">Male</MenuItem>
+                        <MenuItem value="Female">Female</MenuItem>
+                      </Select>
+                    </FormControl>
+
+                    <TextField
+                      id="visits"
+                      label="Website Visits"
+                      fullWidth
+                      sx={{ mt: 2 }}
+                    />
+                    <TextField
+                      id="time"
+                      label="Time Spent"
+                      fullWidth
+                      sx={{ mt: 2 }}
+                    />
+
+                    <Button
+                      variant="contained"
+                      sx={{ mt: 3 }}
+                      onClick={predict}
+                    >
+                      Predict
+                    </Button>
+
+                    {prediction !== null && (
+                      <Box mt={3} textAlign="center">
+                        <Typography variant="h6">
+                          Prediction: {prediction}
+                        </Typography>
+
+                        {probability && (
+                          <Typography>
+                            Probability: {(probability * 100).toFixed(2)}%
+                          </Typography>
+                        )}
+                      </Box>
+                    )}
+                  </CardContent>
+                </Card>
+              </Grid>
+            </Grid>
           </Box>
         )}
       </Box>

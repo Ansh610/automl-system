@@ -1,204 +1,278 @@
-from fastapi import FastAPI, UploadFile
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from collections import Counter
+import numpy as np
+import xgboost as xgb
 
-import pandas as pd
-import joblib
-import os
-
-from backend.automl import run_automl
-from backend.explainability import get_feature_importance
-from backend.bias_detection import detect_bias
-from backend.data_generator import generate_dataset
-from backend.insight_engine import generate_insights
-from backend.data_profiler import generate_report
-
-app = FastAPI()
-
-# Path setup
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-STATIC_DIR = os.path.join(BASE_DIR, "static")
-
-# CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+from sklearn.metrics import (
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score,
+    confusion_matrix,
+    roc_curve,
+    auc,
 )
 
-# Serve React JS/CSS files
-app.mount(
-    "/static",
-    StaticFiles(directory=os.path.join(STATIC_DIR, "static")),
-    name="static"
+from sklearn.model_selection import (
+    train_test_split,
+    GridSearchCV,
 )
 
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.svm import SVC
+from sklearn.neighbors import KNeighborsClassifier
 
-# =============================
-# TRAIN MODEL
-# =============================
+from backend.preprocessing import build_pipeline
 
-@app.post("/train")
-async def train(file: UploadFile, target: str):
 
-    df = pd.read_csv(file.file)
+def run_automl(X, y):
 
-    generate_report(df)
+    if len(X) < 10:
+        raise ValueError(
+            "Dataset must contain at least 10 rows."
+        )
 
-    preview = df.head(10).to_dict(orient="records")
-
-    stats = {
-        "rows": len(df),
-        "columns": len(df.columns),
-        "missing_values": int(df.isnull().sum().sum())
-    }
-
-    X = df.drop(target, axis=1)
-    y = df[target]
-
-    model, best_name, score, scores, metrics, confusion, roc_data = run_automl(X, y)
-
-    joblib.dump(model, "model.pkl")
-
-    importance = get_feature_importance(X, y)
-    importance_dict = dict(zip(X.columns, importance))
-
-    gender_bias = None
-    city_bias = None
-
-    if "gender" in X.columns:
-        gender_bias = detect_bias(model, X, y, X.columns.get_loc("gender"))
-
-    if "city" in X.columns:
-        city_bias = detect_bias(model, X, y, X.columns.get_loc("city"))
-
-    insights = generate_insights(df)
-
-    leaderboard = dict(
-        sorted(scores.items(), key=lambda item: item[1], reverse=True)
+    X_train, X_test, y_train, y_test = train_test_split(
+        X,
+        y,
+        test_size=0.2,
+        random_state=42,
+        stratify=y,
     )
 
-    return {
-        "best_model": best_name,
-        "accuracy": score,
-        "model_scores": leaderboard,
-        "model_metrics": metrics,
-        "confusion_matrix": confusion,
-        "roc_curve": roc_data,
-        "feature_importance": importance_dict,
-        "bias_report": {
-            "gender_bias": gender_bias,
-            "city_bias": city_bias
-        },
-        "insights": insights,
-        "dataset_preview": preview,
-        "dataset_stats": stats
-    }
+    class_counts = Counter(y_train)
 
+    min_class = min(class_counts.values())
 
-# =============================
-# PREDICT
-# =============================
+    cv = max(2, min(5, min_class))
 
-@app.post("/predict")
-async def predict(data: dict):
+    print(f"Using {cv}-Fold Cross Validation")
 
-    model = joblib.load("model.pkl")
+    max_neighbors = max(1, len(X_train) - 1)
 
-    columns = [
-        "age",
-        "income",
-        "city",
-        "gender",
-        "website_visits",
-        "time_spent"
+    knn_values = [
+        k
+        for k in [1, 3, 5, 7, 9]
+        if k <= max_neighbors
     ]
 
-    df = pd.DataFrame([data])
+    models = {
 
-    for col in columns:
-        if col not in df.columns:
-            df[col] = None
+        "LogisticRegression": (
 
-    df = df[columns]
+            LogisticRegression(
+                max_iter=1000,
+                class_weight="balanced",
+                random_state=42,
+            ),
 
-    prediction = model.predict(df)
+            {
+                "C": [0.1, 1, 10]
+            }
 
-    probability = None
+        ),
 
-    if hasattr(model, "predict_proba"):
-        probability = float(model.predict_proba(df)[0][1])
+        "RandomForest": (
 
-    return {
-        "prediction": int(prediction[0]),
-        "probability": probability
+            RandomForestClassifier(
+                random_state=42,
+                class_weight="balanced",
+            ),
+
+            {
+                "n_estimators": [50, 100],
+                "max_depth": [5, 10],
+            }
+
+        ),
+
+        "SVM": (
+
+            SVC(
+                probability=True,
+                class_weight="balanced",
+            ),
+
+            {
+                "C": [0.1, 1, 10],
+                "kernel": ["linear", "rbf"],
+            }
+
+        ),
+
+        "KNN": (
+
+            KNeighborsClassifier(),
+
+            {
+                "n_neighbors": knn_values
+            }
+
+        ),
+
+        "XGBoost": (
+
+            xgb.XGBClassifier(
+                eval_metric="logloss",
+                random_state=42,
+                use_label_encoder=False,
+            ),
+
+            {
+                "n_estimators": [50, 100],
+                "max_depth": [3, 6],
+            }
+
+        ),
     }
 
+    best_model = None
+    best_name = None
+    best_score = -1
 
-# =============================
-# GENERATE DATASET
-# =============================
+    best_preds = None
+    best_proba = None
 
-@app.get("/generate-data")
-def create_dataset():
+    scores = {}
 
-    df = generate_dataset(5000)
+    for name, (model, params) in models.items():
 
-    df.to_csv("generated_leads.csv", index=False)
+        pipeline = build_pipeline(model, X_train)
 
-    return {
-        "message": "Dataset generated",
-        "rows": len(df)
+        param_grid = {
+            "model__" + key: value
+            for key, value in params.items()
+        }
+
+        try:
+
+            grid = GridSearchCV(
+                estimator=pipeline,
+                param_grid=param_grid,
+                cv=cv,
+                scoring="accuracy",
+                n_jobs=-1,
+                error_score=np.nan,
+            )
+
+            grid.fit(X_train, y_train)
+
+            tuned_model = grid.best_estimator_
+
+            preds = tuned_model.predict(X_test)
+
+            acc = accuracy_score(y_test, preds)
+
+            scores[name] = round(acc, 4)
+
+            if hasattr(tuned_model, "predict_proba"):
+
+                proba = tuned_model.predict_proba(X_test)[:, 1]
+
+            elif hasattr(tuned_model, "decision_function"):
+
+                decision = tuned_model.decision_function(X_test)
+
+                decision = (
+                    decision - decision.min()
+                ) / (
+                    decision.max() - decision.min() + 1e-8
+                )
+
+                proba = decision
+
+            else:
+
+                proba = preds
+
+            if acc > best_score:
+
+                best_score = acc
+                best_model = tuned_model
+                best_name = name
+                best_preds = preds
+                best_proba = proba
+
+        except Exception as e:
+
+            print(f"{name} failed: {e}")
+
+            scores[name] = 0
+
+    if best_model is None:
+
+        raise ValueError(
+            "None of the models could be trained on this dataset."
+        )
+
+    metrics = {
+        "accuracy": round(
+            accuracy_score(y_test, best_preds),
+            4,
+        ),
+        "precision": round(
+            precision_score(
+                y_test,
+                best_preds,
+                zero_division=0,
+            ),
+            4,
+        ),
+        "recall": round(
+            recall_score(
+                y_test,
+                best_preds,
+                zero_division=0,
+            ),
+            4,
+        ),
+        "f1": round(
+            f1_score(
+                y_test,
+                best_preds,
+                zero_division=0,
+            ),
+            4,
+        ),
     }
 
+    conf_matrix = confusion_matrix(
+        y_test,
+        best_preds,
+    ).tolist()
 
-# =============================
-# DOWNLOAD MODEL
-# =============================
+    try:
 
-@app.get("/download-model")
-def download_model():
+        fpr, tpr, _ = roc_curve(
+            y_test,
+            best_proba,
+        )
 
-    return FileResponse(
-        "model.pkl",
-        media_type="application/octet-stream",
-        filename="model.pkl"
+        roc_auc = auc(
+            fpr,
+            tpr,
+        )
+
+        roc_data = {
+            "fpr": fpr.tolist(),
+            "tpr": tpr.tolist(),
+            "auc": round(float(roc_auc), 4),
+        }
+
+    except Exception:
+
+        roc_data = {
+            "fpr": [],
+            "tpr": [],
+            "auc": 0,
+        }
+
+    return (
+        best_model,
+        best_name,
+        round(best_score, 4),
+        scores,
+        metrics,
+        conf_matrix,
+        roc_data,
     )
-
-
-# =============================
-# REACT FRONTEND
-# =============================
-
-@app.get("/")
-def serve_react():
-    return FileResponse(os.path.join(STATIC_DIR, "index.html"))
-
-
-@app.get("/favicon.ico")
-def favicon():
-    return FileResponse(os.path.join(STATIC_DIR, "favicon.ico"))
-
-
-@app.get("/manifest.json")
-def manifest():
-    return FileResponse(os.path.join(STATIC_DIR, "manifest.json"))
-
-
-@app.get("/logo192.png")
-def logo192():
-    return FileResponse(os.path.join(STATIC_DIR, "logo192.png"))
-
-
-@app.get("/logo512.png")
-def logo512():
-    return FileResponse(os.path.join(STATIC_DIR, "logo512.png"))
-
-
-# React Router support
-@app.get("/{full_path:path}")
-def serve_react_routes(full_path: str):
-    return FileResponse(os.path.join(STATIC_DIR, "index.html"))

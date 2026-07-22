@@ -1,6 +1,14 @@
+import time
 from collections import Counter
+
 import numpy as np
+import pandas as pd
 import xgboost as xgb
+
+from sklearn.model_selection import (
+    train_test_split,
+    GridSearchCV,
+)
 
 from sklearn.metrics import (
     accuracy_score,
@@ -10,55 +18,69 @@ from sklearn.metrics import (
     confusion_matrix,
     roc_curve,
     auc,
+    mean_absolute_error,
+    mean_squared_error,
+    r2_score,
 )
 
-from sklearn.model_selection import (
-    train_test_split,
-    GridSearchCV,
+from sklearn.linear_model import (
+    LogisticRegression,
+    LinearRegression,
 )
 
-from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.svm import SVC
-from sklearn.neighbors import KNeighborsClassifier
+from sklearn.ensemble import (
+    RandomForestClassifier,
+    RandomForestRegressor,
+    GradientBoostingClassifier,
+    GradientBoostingRegressor,
+)
 
-from backend.preprocessing import build_pipeline
+from sklearn.tree import (
+    DecisionTreeClassifier,
+    DecisionTreeRegressor,
+)
+
+from sklearn.svm import (
+    SVC,
+    SVR,
+)
+
+from sklearn.neighbors import (
+    KNeighborsClassifier,
+    KNeighborsRegressor,
+)
+
+from sklearn.base import is_classifier
+
+from preprocessing import build_pipeline
+
+# ======================================================
+# Detect Task
+# ======================================================
+
+def detect_task(y):
+
+    if pd.api.types.is_numeric_dtype(y):
+
+        unique = y.nunique()
+
+        if unique <= 15:
+            return "classification"
+
+        return "regression"
+
+    return "classification"
 
 
-def run_automl(X, y):
+# ======================================================
+# Classification Models
+# ======================================================
 
-    if len(X) < 10:
-        raise ValueError(
-            "Dataset must contain at least 10 rows."
-        )
+def get_classification_models(max_neighbors):
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        X,
-        y,
-        test_size=0.2,
-        random_state=42,
-        stratify=y,
-    )
+    return {
 
-    class_counts = Counter(y_train)
-
-    min_class = min(class_counts.values())
-
-    cv = max(2, min(5, min_class))
-
-    print(f"Using {cv}-Fold Cross Validation")
-
-    max_neighbors = max(1, len(X_train) - 1)
-
-    knn_values = [
-        k
-        for k in [1, 3, 5, 7, 9]
-        if k <= max_neighbors
-    ]
-
-    models = {
-
-        "LogisticRegression": (
+        "Logistic Regression": (
 
             LogisticRegression(
                 max_iter=1000,
@@ -72,7 +94,7 @@ def run_automl(X, y):
 
         ),
 
-        "RandomForest": (
+        "Random Forest": (
 
             RandomForestClassifier(
                 random_state=42,
@@ -80,8 +102,33 @@ def run_automl(X, y):
             ),
 
             {
-                "n_estimators": [50, 100],
-                "max_depth": [5, 10],
+                "n_estimators": [100, 200],
+                "max_depth": [5, 10, None],
+            }
+
+        ),
+
+        "Decision Tree": (
+
+            DecisionTreeClassifier(
+                random_state=42,
+            ),
+
+            {
+                "max_depth": [5, 10, None]
+            }
+
+        ),
+
+        "Gradient Boosting": (
+
+            GradientBoostingClassifier(
+                random_state=42,
+            ),
+
+            {
+                "n_estimators": [100],
+                "learning_rate": [0.05, 0.1],
             }
 
         ),
@@ -105,7 +152,11 @@ def run_automl(X, y):
             KNeighborsClassifier(),
 
             {
-                "n_neighbors": knn_values
+                "n_neighbors": [
+                    k
+                    for k in [3,5,7,9]
+                    if k <= max_neighbors
+                ]
             }
 
         ),
@@ -115,151 +166,370 @@ def run_automl(X, y):
             xgb.XGBClassifier(
                 eval_metric="logloss",
                 random_state=42,
-                use_label_encoder=False,
             ),
 
             {
-                "n_estimators": [50, 100],
-                "max_depth": [3, 6],
+                "n_estimators":[100],
+                "max_depth":[3,6],
             }
 
         ),
+
     }
+
+
+# ======================================================
+# Regression Models
+# ======================================================
+
+def get_regression_models(max_neighbors):
+
+    return {
+
+        "Linear Regression": (
+
+            LinearRegression(),
+
+            {}
+
+        ),
+
+        "Random Forest": (
+
+            RandomForestRegressor(
+                random_state=42,
+            ),
+
+            {
+                "n_estimators":[100,200],
+                "max_depth":[5,10,None],
+            }
+
+        ),
+
+        "Decision Tree": (
+
+            DecisionTreeRegressor(
+                random_state=42,
+            ),
+
+            {
+                "max_depth":[5,10,None]
+            }
+
+        ),
+
+        "Gradient Boosting": (
+
+            GradientBoostingRegressor(
+                random_state=42,
+            ),
+
+            {
+                "n_estimators":[100],
+                "learning_rate":[0.05,0.1],
+            }
+
+        ),
+
+        "SVR": (
+
+            SVR(),
+
+            {
+                "C":[0.1,1,10]
+            }
+
+        ),
+
+        "KNN": (
+
+            KNeighborsRegressor(),
+
+            {
+                "n_neighbors":[
+                    k
+                    for k in [3,5,7,9]
+                    if k <= max_neighbors
+                ]
+            }
+
+        ),
+
+        "XGBoost": (
+
+            xgb.XGBRegressor(
+                random_state=42,
+            ),
+
+            {
+                "n_estimators":[100],
+                "max_depth":[3,6],
+            }
+
+        ),
+
+    }
+# ======================================================
+# Main AutoML Function
+# ======================================================
+
+def run_automl(X, y):
+
+    if len(X) < 20:
+        raise ValueError(
+            "Dataset must contain at least 20 rows."
+        )
+
+    task = detect_task(y)
+
+    if task == "classification":
+
+        X_train, X_test, y_train, y_test = train_test_split(
+            X,
+            y,
+            test_size=0.2,
+            random_state=42,
+            stratify=y,
+        )
+
+        class_counts = Counter(y_train)
+
+        min_class = min(class_counts.values())
+
+        cv = max(2, min(5, min_class))
+
+        models = get_classification_models(
+            max_neighbors=max(1, len(X_train)-1)
+        )
+
+    else:
+
+        X_train, X_test, y_train, y_test = train_test_split(
+            X,
+            y,
+            test_size=0.2,
+            random_state=42,
+        )
+
+        cv = 5
+
+        models = get_regression_models(
+            max_neighbors=max(1, len(X_train)-1)
+        )
+
+    leaderboard = []
 
     best_model = None
     best_name = None
-    best_score = -1
+    best_score = -999999
 
-    best_preds = None
-    best_proba = None
+    best_predictions = None
+    best_probability = None
 
-    scores = {}
+    training_start = time.time()
 
     for name, (model, params) in models.items():
 
-        pipeline = build_pipeline(model, X_train)
-
-        param_grid = {
-            "model__" + key: value
-            for key, value in params.items()
-        }
-
         try:
 
-            grid = GridSearchCV(
+            pipeline = build_pipeline(model, X_train)
+
+            param_grid = {
+                f"model__{k}": v
+                for k, v in params.items()
+            }
+
+            search = GridSearchCV(
                 estimator=pipeline,
                 param_grid=param_grid,
                 cv=cv,
-                scoring="accuracy",
                 n_jobs=-1,
-                error_score=np.nan,
+                scoring=(
+                    "accuracy"
+                    if task=="classification"
+                    else "r2"
+                ),
+                error_score="raise",
             )
 
-            grid.fit(X_train, y_train)
+            search.fit(X_train, y_train)
 
-            tuned_model = grid.best_estimator_
+            trained_model = search.best_estimator_
 
-            preds = tuned_model.predict(X_test)
+            predictions = trained_model.predict(X_test)
 
-            acc = accuracy_score(y_test, preds)
+            if task == "classification":
 
-            scores[name] = round(acc, 4)
-
-            if hasattr(tuned_model, "predict_proba"):
-
-                proba = tuned_model.predict_proba(X_test)[:, 1]
-
-            elif hasattr(tuned_model, "decision_function"):
-
-                decision = tuned_model.decision_function(X_test)
-
-                decision = (
-                    decision - decision.min()
-                ) / (
-                    decision.max() - decision.min() + 1e-8
+                score = accuracy_score(
+                    y_test,
+                    predictions,
                 )
 
-                proba = decision
+                if hasattr(trained_model, "predict_proba"):
+
+                    probability = trained_model.predict_proba(
+                        X_test
+                    )[:,1]
+
+                else:
+
+                    probability = None
 
             else:
 
-                proba = preds
+                score = r2_score(
+                    y_test,
+                    predictions,
+                )
 
-            if acc > best_score:
+                probability = None
 
-                best_score = acc
-                best_model = tuned_model
+            leaderboard.append({
+
+                "model": name,
+                "score": round(float(score),4)
+
+            })
+
+            if score > best_score:
+
+                best_score = score
+                best_model = trained_model
                 best_name = name
-                best_preds = preds
-                best_proba = proba
+                best_predictions = predictions
+                best_probability = probability
 
         except Exception as e:
 
-            print(f"{name} failed: {e}")
+            print(f"{name} failed -> {e}")
 
-            scores[name] = 0
+    leaderboard = sorted(
+        leaderboard,
+        key=lambda x: x["score"],
+        reverse=True,
+    )
 
-    if best_model is None:
+    total_time = round(
+        time.time()-training_start,
+        2,
+    )
 
-        raise ValueError(
-            "None of the models could be trained on this dataset."
-        )
+    if task == "classification":
 
-    metrics = {
-        "accuracy": round(
-            accuracy_score(y_test, best_preds),
-            4,
-        ),
-        "precision": round(
-            precision_score(
-                y_test,
-                best_preds,
-                zero_division=0,
+        metrics = {
+
+            "accuracy": round(
+                accuracy_score(
+                    y_test,
+                    best_predictions,
+                ),
+                4,
             ),
-            4,
-        ),
-        "recall": round(
-            recall_score(
-                y_test,
-                best_preds,
-                zero_division=0,
+
+            "precision": round(
+                precision_score(
+                    y_test,
+                    best_predictions,
+                    zero_division=0,
+                ),
+                4,
             ),
-            4,
-        ),
-        "f1": round(
-            f1_score(
-                y_test,
-                best_preds,
-                zero_division=0,
+
+            "recall": round(
+                recall_score(
+                    y_test,
+                    best_predictions,
+                    zero_division=0,
+                ),
+                4,
             ),
-            4,
-        ),
-    }
 
-    conf_matrix = confusion_matrix(
-        y_test,
-        best_preds,
-    ).tolist()
+            "f1_score": round(
+                f1_score(
+                    y_test,
+                    best_predictions,
+                    zero_division=0,
+                ),
+                4,
+            ),
 
-    try:
-
-        fpr, tpr, _ = roc_curve(
-            y_test,
-            best_proba,
-        )
-
-        roc_auc = auc(
-            fpr,
-            tpr,
-        )
-
-        roc_data = {
-            "fpr": fpr.tolist(),
-            "tpr": tpr.tolist(),
-            "auc": round(float(roc_auc), 4),
         }
 
-    except Exception:
+        confusion = confusion_matrix(
+            y_test,
+            best_predictions,
+        ).tolist()
+
+        try:
+
+            if best_probability is not None:
+
+                fpr, tpr, _ = roc_curve(
+                    y_test,
+                    best_probability,
+                )
+
+                roc_data = {
+
+                    "fpr": fpr.tolist(),
+                    "tpr": tpr.tolist(),
+                    "auc": round(
+                        auc(fpr,tpr),
+                        4,
+                    ),
+
+                }
+
+            else:
+
+                roc_data = {
+                    "fpr": [],
+                    "tpr": [],
+                    "auc": 0,
+                }
+
+        except:
+
+            roc_data = {
+                "fpr": [],
+                "tpr": [],
+                "auc": 0,
+            }
+
+    else:
+
+        metrics = {
+
+            "r2_score": round(
+                r2_score(
+                    y_test,
+                    best_predictions,
+                ),
+                4,
+            ),
+
+            "mae": round(
+                mean_absolute_error(
+                    y_test,
+                    best_predictions,
+                ),
+                4,
+            ),
+
+            "rmse": round(
+                np.sqrt(
+                    mean_squared_error(
+                        y_test,
+                        best_predictions,
+                    )
+                ),
+                4,
+            ),
+
+        }
+
+        confusion = []
 
         roc_data = {
             "fpr": [],
@@ -268,11 +538,23 @@ def run_automl(X, y):
         }
 
     return (
+
         best_model,
+
         best_name,
-        round(best_score, 4),
-        scores,
+
+        round(float(best_score),4),
+
+        leaderboard,
+
         metrics,
-        conf_matrix,
+
+        confusion,
+
         roc_data,
+
+        task,
+
+        total_time,
+
     )

@@ -1,26 +1,23 @@
-from fastapi import FastAPI, UploadFile
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
-import pandas as pd
+import io
 import joblib
-import os
+import pandas as pd
 
-from backend.automl import run_automl
-from backend.explainability import get_feature_importance
-from backend.bias_detection import detect_bias
-from backend.data_generator import generate_dataset
-from backend.insight_engine import generate_insights
-from backend.data_profiler import generate_report
+from pathlib import Path
 
-app = FastAPI()
+from automl import run_automl
+from explainability import get_feature_importance
+from bias_detection import detect_bias
+from data_generator import generate_dataset
+from insight_engine import generate_insights
+from data_profiler import generate_report
 
-# Path setup
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-STATIC_DIR = os.path.join(BASE_DIR, "static")
+app = FastAPI(title="AutoML Decision System")
 
-# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -29,93 +26,147 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Serve React build
+BASE_DIR = Path(__file__).resolve().parent
+STATIC_DIR = BASE_DIR / "static"
+
+MODEL_DIR = BASE_DIR / "models"
+MODEL_DIR.mkdir(exist_ok=True)
+
+MODEL_PATH = MODEL_DIR / "model.pkl"
+METADATA_PATH = MODEL_DIR / "metadata.pkl"
+
 app.mount(
     "/static",
-    StaticFiles(directory=os.path.join(STATIC_DIR, "static")),
+    StaticFiles(directory=STATIC_DIR / "static"),
     name="static",
 )
 
 
-# =============================
-# TRAIN MODEL
-# =============================
+# ============================
+# Train
+# ============================
 
 @app.post("/train")
-async def train(file: UploadFile, target: str):
+async def train(
+    file: UploadFile = File(...),
+    target_column: str = Form(...),
+    task: str = Form("classification"),
+):
+    contents = await file.read()
 
-    df = pd.read_csv(file.file)
+    try:
+        df = pd.read_csv(io.BytesIO(contents))
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Could not read CSV: {exc}")
 
-    generate_report(df)
+    if target_column not in df.columns:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Target column '{target_column}' not found in dataset.",
+        )
 
-    preview = df.head(10).to_dict(orient="records")
+    X = df.drop(columns=[target_column])
+    y = df[target_column]
 
-    stats = {
-        "rows": len(df),
-        "columns": len(df.columns),
-        "missing_values": int(df.isnull().sum().sum())
-    }
-
-    X = df.drop(target, axis=1)
-    y = df[target]
-
-    model, best_name, score, scores, metrics, confusion, roc_data = run_automl(X, y)
-
-    joblib.dump(model, "model.pkl")
+    (
+        model,
+        best_name,
+        score,
+        leaderboard,
+        metrics,
+        confusion,
+        roc_data,
+        task,
+        training_time,
+    ) = run_automl(X, y)
 
     importance = get_feature_importance(X, y)
-    importance_dict = dict(zip(X.columns, importance))
+
+    importance_dict = dict(
+        zip(
+            X.columns,
+            importance,
+        )
+    )
 
     gender_bias = None
     city_bias = None
 
     if "gender" in X.columns:
-        gender_bias = detect_bias(model, X, y, X.columns.get_loc("gender"))
+        gender_bias = detect_bias(
+            model,
+            X,
+            y,
+            X.columns.get_loc("gender"),
+        )
 
     if "city" in X.columns:
-        city_bias = detect_bias(model, X, y, X.columns.get_loc("city"))
+        city_bias = detect_bias(
+            model,
+            X,
+            y,
+            X.columns.get_loc("city"),
+        )
 
     insights = generate_insights(df)
+    generate_report(df)  # writes data_report.html to BASE_DIR
 
-    leaderboard = dict(
-        sorted(scores.items(), key=lambda item: item[1], reverse=True)
-    )
+    joblib.dump(model, MODEL_PATH)
+    joblib.dump({"columns": list(X.columns), "task": task}, METADATA_PATH)
+
+    preview = df.head(10).to_dict(orient="records")
+    stats = df.describe(include="all").fillna("").to_dict()
 
     return {
+        "task": task,
         "best_model": best_name,
-        "accuracy": score,
-        "model_scores": leaderboard,
-        "model_metrics": metrics,
+        "best_score": score,
+        "score": score,
+        "training_time": round(training_time, 2),
+
+        "dataset_rows": len(df),
+        "dataset_columns": len(df.columns),
+        "missing_values": int(df.isnull().sum().sum()),
+
+        "columns": list(X.columns),
+
+        "leaderboard": leaderboard,
+        "metrics": metrics,
+
         "confusion_matrix": confusion,
         "roc_curve": roc_data,
+
         "feature_importance": importance_dict,
+
         "bias_report": {
             "gender_bias": gender_bias,
-            "city_bias": city_bias
+            "city_bias": city_bias,
         },
+
         "insights": insights,
+
         "dataset_preview": preview,
-        "dataset_stats": stats
+        "dataset_stats": stats,
     }
 
 
-# =============================
-# PREDICT
-# =============================
+# ============================
+# Predict
+# ============================
 
 @app.post("/predict")
 async def predict(data: dict):
+    if not MODEL_PATH.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="No trained model found."
+        )
 
-    model = joblib.load("model.pkl")
+    model = joblib.load(MODEL_PATH)
+    metadata = joblib.load(METADATA_PATH)
 
-    columns = [
-        "age",
-        "income",
-        "city",
-        "gender",
-        "website_visits",
-        "time_spent"
-    ]
+    columns = metadata["columns"]
+    task = metadata["task"]
 
     df = pd.DataFrame([data])
 
@@ -125,79 +176,119 @@ async def predict(data: dict):
 
     df = df[columns]
 
-    prediction = model.predict(df)
+    prediction = model.predict(df)[0]
+
+    try:
+        if hasattr(prediction, "item"):
+            prediction = prediction.item()
+    except Exception:
+        pass
 
     probability = None
 
-    if hasattr(model, "predict_proba"):
-        probability = float(model.predict_proba(df)[0][1])
+    if task == "classification":
+        if hasattr(model, "predict_proba"):
+            probability = float(
+                model.predict_proba(df)[0].max()
+            )
 
     return {
-        "prediction": int(prediction[0]),
-        "probability": probability
+        "task": task,
+        "prediction": (
+            float(prediction)
+            if task == "regression"
+            else int(prediction)
+        ),
+        "probability": probability,
     }
 
 
-# =============================
-# GENERATE DATASET
-# =============================
+# ============================
+# Generate Sample Dataset
+# ============================
 
 @app.get("/generate-data")
-def create_dataset():
-
+def generate_data():
     df = generate_dataset(5000)
-
-    df.to_csv("generated_leads.csv", index=False)
+    path = BASE_DIR / "generated_dataset.csv"
+    df.to_csv(path, index=False)
 
     return {
         "message": "Dataset generated",
-        "rows": len(df)
+        "rows": len(df),
     }
 
 
-# =============================
-# DOWNLOAD MODEL
-# =============================
+# ============================
+# Download Model
+# ============================
 
 @app.get("/download-model")
 def download_model():
+    if not MODEL_PATH.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="Model not found."
+        )
 
     return FileResponse(
-        "model.pkl",
+        MODEL_PATH,
+        filename="model.pkl",
         media_type="application/octet-stream",
-        filename="model.pkl"
     )
 
 
-# =============================
-# REACT FRONTEND
-# =============================
+# ============================
+# Download Report
+# ============================
+
+@app.get("/download-report")
+def download_report():
+    report = BASE_DIR / "data_report.html"
+
+    if not report.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="Report not found."
+        )
+
+    return FileResponse(
+        report,
+        filename="AutoML_Report.html",
+        media_type="text/html",
+    )
+
+
+# ============================
+# React Frontend
+# ============================
 
 @app.get("/")
-def serve_react():
-    return FileResponse(os.path.join(STATIC_DIR, "index.html"))
+def home():
+    return FileResponse(STATIC_DIR / "index.html")
 
 
 @app.get("/favicon.ico")
 def favicon():
-    return FileResponse(os.path.join(STATIC_DIR, "favicon.ico"))
+    return FileResponse(STATIC_DIR / "favicon.ico")
 
 
 @app.get("/manifest.json")
 def manifest():
-    return FileResponse(os.path.join(STATIC_DIR, "manifest.json"))
+    return FileResponse(STATIC_DIR / "manifest.json")
 
 
 @app.get("/logo192.png")
 def logo192():
-    return FileResponse(os.path.join(STATIC_DIR, "logo192.png"))
+    return FileResponse(STATIC_DIR / "logo192.png")
 
 
 @app.get("/logo512.png")
 def logo512():
-    return FileResponse(os.path.join(STATIC_DIR, "logo512.png"))
+    return FileResponse(STATIC_DIR / "logo512.png")
 
 
-@app.get("/{full_path:path}")
-def serve_react_routes(full_path: str):
-    return FileResponse(os.path.join(STATIC_DIR, "index.html"))
+# Catch-all must stay last so it doesn't shadow the routes above.
+@app.get("/{path:path}")
+def react_router(path: str):
+    return FileResponse(STATIC_DIR / "index.html")

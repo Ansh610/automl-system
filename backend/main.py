@@ -79,8 +79,7 @@ async def train(
         training_time,
     ) = run_automl(X, y)
 
-    importance = get_feature_importance(X, y)
-
+    importance = get_feature_importance(model, X, y)
     importance_dict = dict(
         zip(
             X.columns,

@@ -33,7 +33,8 @@ import {
   Area,
 } from "recharts";
 
-const API = process.env.REACT_APP_API || "http://localhost:8000";
+const API =
+  process.env.NODE_ENV === "development" ? "http://localhost:8000" : "";
 
 /* ------------------------------------------------------------------ */
 /*  DESIGN TOKENS                                                      */

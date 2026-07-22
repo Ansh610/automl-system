@@ -52,7 +52,7 @@ from sklearn.neighbors import (
 
 from sklearn.base import is_classifier
 
-from preprocessing import build_pipeline
+from backend.preprocessing import build_pipeline
 
 # ======================================================
 # Detect Task

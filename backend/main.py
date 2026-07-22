@@ -9,12 +9,12 @@ import pandas as pd
 
 from pathlib import Path
 
-from automl import run_automl
-from explainability import get_feature_importance
-from bias_detection import detect_bias
-from data_generator import generate_dataset
-from insight_engine import generate_insights
-from data_profiler import generate_report
+from backend.automl import run_automl
+from backend.explainability import get_feature_importance
+from backend.bias_detection import detect_bias
+from backend.data_generator import generate_dataset
+from backend.insight_engine import generate_insights
+from backend.data_profiler import generate_report
 
 app = FastAPI(title="AutoML Decision System")
 

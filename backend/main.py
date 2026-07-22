@@ -6,7 +6,6 @@ from fastapi.staticfiles import StaticFiles
 import io
 import joblib
 import pandas as pd
-
 from pathlib import Path
 
 from backend.automl import run_automl

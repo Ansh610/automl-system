@@ -1,121 +1,73 @@
-# 🚀 AutoML Intelligence Platform
+# 🚀 AutoML Studio
 
-A full-stack **AutoML web application** that automatically trains multiple machine learning models, evaluates their performance, detects bias, generates insights, and provides an interactive dashboard for analysis and prediction.
-
-The platform allows users to upload datasets, run automated model training, compare results visually, and make real-time predictions through a modern React dashboard.
+> An end-to-end **AutoML Decision Intelligence Platform** that automatically trains multiple machine learning models, selects the best performer, explains predictions, detects bias, generates AI insights, and deploys a production-ready model through an interactive web dashboard.
 
 ---
 
-# 🌐 Live Demo
+## 🌐 Live Demo
 
-🔗 **Live App:**
-https://automl-system-1.onrender.com
+**🔗 Live Application:** https://automl-system-2-idwx.onrender.com/
 
-📂 **GitHub Repository:**
-https://github.com/Ansh610/automl-system
+**📂 GitHub Repository:** https://github.com/Ansh610/automl-system
 
 ---
 
-# 📊 Features
+# 📌 Overview
 
-### 🤖 Automated Machine Learning
+AutoML Studio simplifies the machine learning workflow by automating:
 
-Automatically trains and evaluates multiple ML models including:
+- Dataset preprocessing
+- Missing value handling
+- Feature encoding
+- Model comparison
+- Automatic algorithm selection
+- Performance evaluation
+- Feature importance analysis
+- Bias detection
+- AI-generated business insights
+- Model deployment
+- Prediction API
 
-* Logistic Regression
-* Random Forest
-* Support Vector Machine (SVM)
-* K-Nearest Neighbors (KNN)
-* XGBoost
-
-Performs hyperparameter tuning using **GridSearchCV** and selects the best model automatically.
-
----
-
-### 📈 Model Performance Dashboard
-
-Interactive charts built with **Recharts**:
-
-* Model accuracy comparison
-* Classification performance metrics
-* ROC curve with AUC
-* Feature importance visualization
-* Confusion matrix visualization
+Instead of manually testing multiple algorithms, users simply upload a CSV dataset and AutoML Studio performs the complete ML pipeline automatically.
 
 ---
 
-### ⚖️ Bias Detection
+# ✨ Features
 
-Detects potential bias in model predictions across sensitive attributes such as:
+✅ Automatic Classification & Regression Detection
 
-* Gender
-* City
+✅ Trains Multiple ML Algorithms
 
-Helps identify fairness issues in machine learning models.
+- Logistic Regression
+- Random Forest
+- Gradient Boosting
+- Decision Tree
+- KNN
+- SVM
+- XGBoost
 
----
+✅ Automatic Best Model Selection
 
-### 🔎 Data Profiling
+✅ Leaderboard Ranking
 
-Automatically generates a dataset report including:
+✅ Feature Importance Visualization
 
-* Number of rows
-* Number of columns
-* Missing values
-* Dataset preview
+✅ Confusion Matrix
 
----
+✅ ROC Curve
 
-### 💡 AI Business Insights
+✅ Bias Detection
 
-Generates automated insights from the dataset to help understand patterns and potential business outcomes.
+- Gender Bias
+- City Bias
 
----
+✅ AI Generated Business Insights
 
-### 🔮 Real-Time Prediction
+✅ Model Download
 
-Users can manually input customer data to predict conversion likelihood.
+✅ Data Profiling Report
 
-Inputs include:
-
-* Age
-* Income
-* City
-* Gender
-* Website visits
-* Time spent
-
-The model returns:
-
-* Prediction (Convert / Not Convert)
-* Probability score
-
----
-
-### 📂 Dataset Generator
-
-Built-in endpoint to generate synthetic lead datasets for testing.
-
----
-
-# 🧠 System Architecture
-
-Frontend and backend are separated for scalability.
-
-```
-React Dashboard
-        │
-        │ API Requests
-        ▼
-FastAPI Backend
-        │
-        ├── AutoML Training
-        ├── Bias Detection
-        ├── Explainability
-        ├── Dataset Insights
-        ▼
-Machine Learning Models
-```
+✅ Real-Time Prediction
 
 ---
 
@@ -123,31 +75,212 @@ Machine Learning Models
 
 ### Frontend
 
-* React
-* Material UI
-* Recharts
-* Axios
-* React Dropzone
+- React.js
+- Axios
+- Chart.js
+- CSS3
 
 ### Backend
 
-* FastAPI
-* Uvicorn
+- FastAPI
+- Python
 
 ### Machine Learning
 
-* Scikit-learn
-* XGBoost
-* Pandas
-* NumPy
-* Joblib
+- Scikit-learn
+- XGBoost
+- Pandas
+- NumPy
+- Joblib
+
+### Explainability
+
+- Permutation Feature Importance
+
+### Data Profiling
+
+- ydata-profiling
 
 ### Deployment
 
-* Render
+- Render
+
+---
+
+# 📊 Dashboard Preview
+
+## Upload & Train
+
+![Upload]<img src="Screenshot 2026-07-22 181344.png" alt="Project Screenshot" width="500">
+
+---
+
+## Model Leaderboard & Performance Metrics
+
+![Dashboard]<img src="Screenshot 2026-07-22 181424.png" alt="Project Screenshot" width="500">
+
+
+---
+
+## Explainability
+
+- Feature Importance
+- ROC Curve
+- Confusion Matrix
+
+![Explainability]<img src="Screenshot 2026-07-22 181440.png" alt="Project Screenshot" width="500">
+
+
+---
+
+## AI Insights & Prediction
+
+![Prediction]<img src="Screenshot 2026-07-22 183508.png" alt="Project Screenshot" width="500">
+
+
+---
+
+# ⚙️ Machine Learning Pipeline
+
+```text
+Upload Dataset
+        │
+        ▼
+Data Validation
+        │
+        ▼
+Missing Value Handling
+        │
+        ▼
+Categorical Encoding
+        │
+        ▼
+Feature Scaling
+        │
+        ▼
+Train Multiple Models
+        │
+        ▼
+Model Evaluation
+        │
+        ▼
+Best Model Selection
+        │
+        ▼
+Feature Importance
+        │
+        ▼
+Bias Detection
+        │
+        ▼
+AI Insights
+        │
+        ▼
+Prediction API
+```
+
+---
+
+# 📈 Evaluation Metrics
+
+The platform automatically computes:
+
+- Accuracy
+- Precision
+- Recall
+- F1 Score
+- ROC Curve
+- Confusion Matrix
+
+---
+
+# 🔍 Explainable AI
+
+AutoML Studio provides explainability through:
+
+- Feature Importance Analysis
+- Model Comparison Leaderboard
+- ROC Curve
+- Confusion Matrix
+- Business Insights
+
+This enables users to understand **why** a model makes predictions instead of treating it as a black box.
+
+---
+
+# ⚖️ Bias Detection
+
+The application evaluates fairness by measuring prediction differences across sensitive attributes such as:
+
+- Gender
+- City
+
+This helps identify potential model bias before deployment.
+
+---
+
+# 💡 AI Generated Insights
+
+The system automatically analyzes datasets and generates meaningful business insights such as:
+
+- Conversion rate trends
+- Important influencing features
+- Dataset quality summary
+- Missing value analysis
+- High-impact variables
+
+
+# 📂 Project Structure
+
+```
+automl-system/
+
+├── backend/
+│   ├── main.py
+│   ├── automl.py
+│   ├── explainability.py
+│   ├── bias_detection.py
+│   ├── insight_engine.py
+│   ├── data_profiler.py
+│   └── requirements.txt
+│
+├── frontend/
+│   ├── src/
+│   ├── public/
+│   └── package.json
+│
+├── models/
+│
+└── README.md
+```
+
+---
+
+# 🚀 Future Improvements
+
+- SHAP Explainability
+- Hyperparameter Optimization
+- Deep Learning Model Support
+- Auto Feature Engineering
+- Time Series Forecasting
+- NLP Dataset Support
+- PDF Report Export
+- Docker Deployment
+
+---
 
 # 👨‍💻 Author
 
-**Ansh**
+**Ansh Kumar**
 
+GitHub
 
+https://github.com/Ansh610
+
+LinkedIn
+
+https://www.linkedin.com/in/anshkumar610/
+
+---
+
+# ⭐ If you found this project useful, consider giving it a Star.
